@@ -78,6 +78,12 @@ int main(int argc, char **argv) {
         } else if (argv[1] == "connect"s) {
             ok = true;
             mode = std::make_unique<ConnectMode>(arg);
+        } else if (argv[1] == "stdio-a"s) {
+            ok = true;
+            mode = std::make_unique<StdioModeA>();
+        } else if (argv[1] == "stdio-b"s) {
+            ok = true;
+            mode = std::make_unique<StdioModeB>();
         }
 
         if (argc == 4) {

@@ -6,6 +6,7 @@ openssl_dep = dependency('openssl', version: '>= 3.3')
 
 main_deps = [
   dependency('glib-2.0'),
+  dependency('gio-unix-2.0'),
   #libsoup_static_dep, # system libsoup caused 100% cpu usage on debian buster:
   dependency('libsoup-2.4'),
   dependency('nice'),

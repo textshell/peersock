@@ -108,3 +108,42 @@ private:
     bool _bridged = false;
     SSL *_bridgeStream = nullptr;
 };
+
+struct StdioModeA : public ModeBase {
+    StdioModeA();
+
+    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    int handleQuicStreamOpened(SSL *stream) override;
+    void quicPoll() override;
+
+private:
+    GOutputStream *_localOutputStream = nullptr;
+    GInputStream *_localInputStream = nullptr;
+    std::optional<SslToOutputStreamForwarder> _ssl_to_socket_forwarder;
+    std::optional<InputStreamToSslForwarder> _socket_to_ssl_forwarder;
+
+    SSL *q_connection = nullptr;
+    std::function<void()> _tick;
+    bool _bridged = false;
+    SSL *_bridgeStream = nullptr;
+};
+
+struct StdioModeB : public ModeBase {
+    StdioModeB();
+
+    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    int handleQuicStreamOpened(SSL *stream) override;
+    void quicPoll() override;
+
+private:
+    GInputStream *_localInputStream = nullptr;
+    GOutputStream *_localOutputStream = nullptr;
+
+    SSL *q_connection = nullptr;
+    std::function<void()> _tick;
+    bool _bridged = false;
+    SSL *_bridgeStream = nullptr;
+
+    std::optional<InputStreamToSslForwarder> _socket_to_ssl_forwarder;
+    std::optional<SslToOutputStreamForwarder> _ssl_to_socket_forwarder;
+};

@@ -1,6 +1,8 @@
 #include "modes.h"
 
 #include <glib.h>
+#include <gio/gunixoutputstream.h>
+#include <gio/gunixinputstream.h>
 
 #include "utils.h"
 
@@ -252,4 +254,88 @@ void ConnectMode::localConnectCallback(GObject *source_object, GAsyncResult *res
 
 void ConnectMode::wrap_localConnectCallback(GObject *source_object, GAsyncResult *res, gpointer user_data) {
     reinterpret_cast<ConnectMode*>(user_data)->localConnectCallback(source_object, res);
+}
+
+StdioModeA::StdioModeA() {
+}
+
+void StdioModeA::connectionMade(std::function<void ()> tick, SSL *connection) {
+    _tick = tick;
+    q_connection = connection;
+    _bridged = true;
+
+    _localOutputStream = g_unix_output_stream_new(1, false);
+    _localInputStream = g_unix_input_stream_new(0, false);
+}
+
+int StdioModeA::handleQuicStreamOpened(SSL *stream) {
+    _bridgeStream = stream;
+    SSL_set_mode(_bridgeStream, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    char buf[1];
+    size_t readbytes = -1;
+    int ret = SSL_read_ex(_bridgeStream, buf, 1, &readbytes);
+    if (ret != 1) {
+        fatal_ossl("initial read on payload stream failed:\n");
+    }
+    if (readbytes != 1) {
+        fatal("initial read on payload stream wrong sizes: {}\n", readbytes);
+    }
+    if (buf[0] != 'X') {
+        fatal("initial read on payload stream unexpected data: {}\n", buf[0]);
+    }
+    _ssl_to_socket_forwarder.emplace(_tick, _bridgeStream, _localOutputStream);
+    _socket_to_ssl_forwarder.emplace(_tick, _localInputStream, _bridgeStream);
+    return 0;
+}
+
+void StdioModeA::quicPoll() {
+    if (_ssl_to_socket_forwarder) {
+        _ssl_to_socket_forwarder->quicPoll();
+    }
+    if (_socket_to_ssl_forwarder) {
+        _socket_to_ssl_forwarder->quicPoll();
+    }
+}
+
+StdioModeB::StdioModeB() {
+}
+
+void StdioModeB::connectionMade(std::function<void ()> tick, SSL *connection) {
+    _tick = tick;
+    q_connection = connection;
+    _bridged = true;
+
+    _bridgeStream = SSL_new_stream(q_connection, 0);
+    if (!_bridgeStream) {
+        fatal_ossl("SSL_new_stream for bridging:\n");
+    }
+    // Stream open only is send if data is written to the stream
+    size_t written = -1;
+    int ret = SSL_write_ex(_bridgeStream, "X", 1, &written);
+    if (ret != 1 || written != 1) {
+        fatal_ossl("Failed in initial write to payload stream:\n");
+    }
+
+    SSL_set_mode(_bridgeStream, SSL_MODE_ENABLE_PARTIAL_WRITE);
+
+    _localOutputStream = g_unix_output_stream_new(1, false);
+    _localInputStream = g_unix_input_stream_new(0, false);
+
+    _ssl_to_socket_forwarder.emplace(_tick, _bridgeStream, _localOutputStream);
+    _socket_to_ssl_forwarder.emplace(_tick, _localInputStream, _bridgeStream);
+}
+
+int StdioModeB::handleQuicStreamOpened(SSL *stream) {
+    fatal("Unexpected stream\n");
+
+    return 0;
+}
+
+void StdioModeB::quicPoll() {
+    if (_ssl_to_socket_forwarder) {
+        _ssl_to_socket_forwarder->quicPoll();
+    }
+    if (_socket_to_ssl_forwarder) {
+        _socket_to_ssl_forwarder->quicPoll();
+    }
 }
