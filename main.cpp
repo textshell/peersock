@@ -61,12 +61,24 @@ int main(int argc, char **argv) {
     std::string code;
     std::unique_ptr<ModeBase> mode;
 
+    std::vector<std::string> remainingArgs;
+
+    for (int i = 1; i < argc; i++) {
+        if (argv[i] == "--json"s) {
+            setJsonOutputMode(true);
+        } else {
+            remainingArgs.push_back(std::string(argv[i]));
+        }
+    }
 
     bool ok = false;
-    if (argc == 3 || argc == 4) {
-        std::string arg = argv[2];
-        if (argv[1] == "listen"s) {
+    if (remainingArgs.size()) {
+        std::string command = remainingArgs[0];
+
+        if (command == "listen"s && (remainingArgs.size() == 2 || remainingArgs.size() == 3)) {
             uint16_t port;
+
+            std::string arg = remainingArgs[1];
 
             auto [ptr, ec] = std::from_chars(arg.data(), arg.data() + arg.size(), port);
             if (ec == std::errc{}) {
@@ -75,23 +87,40 @@ int main(int argc, char **argv) {
             } else {
                 fatal("Can't parse port '{}'\n", arg);
             }
-        } else if (argv[1] == "connect"s) {
+
+            if (remainingArgs.size() == 3) {
+                code = remainingArgs[2];
+            }
+        } else if (command == "connect"s && (remainingArgs.size() == 2 || remainingArgs.size() == 3)) {
             ok = true;
+
+            std::string arg = remainingArgs[1];
+
             mode = std::make_unique<ConnectMode>(arg);
-        } else if (argv[1] == "stdio-a"s) {
+
+            if (remainingArgs.size() == 3) {
+                code = remainingArgs[2];
+            }
+        } else if (command == "stdio-a"s && (remainingArgs.size() == 1 || remainingArgs.size() == 2)) {
             ok = true;
             mode = std::make_unique<StdioModeA>();
-        } else if (argv[1] == "stdio-b"s) {
+
+            if (remainingArgs.size() == 2) {
+                code = remainingArgs[1];
+            }
+        } else if (command == "stdio-b"s && (remainingArgs.size() == 1 || remainingArgs.size() == 2)) {
             ok = true;
             mode = std::make_unique<StdioModeB>();
+
+            if (remainingArgs.size() == 2) {
+                code = remainingArgs[1];
+            }
         }
 
-        if (argc == 4) {
-            if (std::string(argv[3]).find_first_of('-') == std::string::npos) {
+        if (code.size()) {
+            if (std::string(code).find_first_of('-') == std::string::npos) {
                 fatal("Code format invalid\n");
             }
-            code = argv[3];
-        } else {
         }
     }
 
