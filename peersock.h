@@ -10,6 +10,7 @@
 class RemoteConnection {
 public:
     virtual SSL *ssl() = 0;
+    virtual void shutdown() = 0;
 };
 
 struct ModeBase {

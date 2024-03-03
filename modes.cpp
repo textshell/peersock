@@ -85,9 +85,17 @@ void InputStreamToSslForwarder::localReadCallback(GObject *source_object, GAsync
     log(LOG_FWD, "FWD: read finished\n");
 
     if (read == 0) {
-        fmt::print(stderr, "connection close\n");
-        // TODO
-        exit(0);
+        if (!onClose) {
+            writeUserMessage({
+                                 {"event", "connection-close"},
+                             },
+                             "connection close\n");
+            // TODO
+            exit(0);
+        } else {
+            onClose();
+        }
+        return;
     }
 
     //log(LOG_FWD, "read local input: {}\n", std::string_view((const char*)_buffer.data(), read));
@@ -289,6 +297,16 @@ int StdioModeA::handleQuicStreamOpened(SSL *stream) {
     }
     _ssl_to_socket_forwarder.emplace(_tick, _bridgeStream, _localOutputStream);
     _socket_to_ssl_forwarder.emplace(_tick, _localInputStream, _bridgeStream);
+
+    _socket_to_ssl_forwarder->onClose = [this] {
+        writeUserMessage({
+                             {"event", "connection-close"},
+                         },
+                         "connection closed\n");
+        q_connection->shutdown();
+        _tick();
+    };
+
     return 0;
 }
 
@@ -327,6 +345,14 @@ void StdioModeB::connectionMade(std::function<void ()> tick, RemoteConnection *c
 
     _ssl_to_socket_forwarder.emplace(_tick, _bridgeStream, _localOutputStream);
     _socket_to_ssl_forwarder.emplace(_tick, _localInputStream, _bridgeStream);
+    _socket_to_ssl_forwarder->onClose = [this] {
+        writeUserMessage({
+                             {"event", "connection-close"},
+                         },
+                         "connection closed\n");
+        q_connection->shutdown();
+        _tick();
+    };
 }
 
 int StdioModeB::handleQuicStreamOpened(SSL *stream) {

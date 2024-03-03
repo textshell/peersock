@@ -40,6 +40,8 @@ public:
 
     void startAsyncRead();
 
+    std::function<void()> onClose;
+
 private:
     std::function<void()> _tick;
     GInputStream *_input_stream = nullptr;

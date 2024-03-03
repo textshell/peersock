@@ -44,6 +44,14 @@ static SSL_CTX *quic_ssl_ctx;
 static BIO *quic_dgram_bio;
 
 
+enum class ShutdownState {
+    noShutdown,
+    shutdownPending,
+    shutdownDone,
+};
+
+static ShutdownState in_shutdown;
+
 static bool quicConnectionUp = false;
 static int iceStreamId = -1;
 static OtrlSMState authState;
@@ -56,6 +64,8 @@ static SSL *quic_client;
 // server (initiator)
 static SSL *quic_connection;
 
+// ---
+
 static void quicPoll();
 
 class RemoteConnectionImpl : public RemoteConnection {
@@ -67,6 +77,14 @@ public:
         return _ssl;
     }
 
+    void shutdown() override {
+        int ret = SSL_shutdown(_ssl);
+        if (ret < 0) {
+            fatal_ossl("SSL_shutdown failed:\n");
+        }
+        in_shutdown = ret ? in_shutdown = ShutdownState::shutdownDone : ShutdownState::shutdownPending;
+        ::quicPoll();
+    }
 
     SSL *_ssl = nullptr;
 };
@@ -476,7 +494,7 @@ struct RoleInitiator {
             }
         }
 
-        if (quicAuthStream) {
+        if (quicAuthStream && !authDone) {
             //log(LOG_QUIC, "quic read on auth: l{}:{}\n", read, std::string_view{(const char*)buf, (uint)read});
             quicReadFramedMessageOrDie(quicAuthStream, AuthStreamBuffer, [&] (uint8_t *frame, ssize_t frameLen) {
                 log(LOG_AUTH, "Auth step {}\n", authStep);
@@ -719,7 +737,7 @@ struct RoleFromCode {
     }
 
     void quicPoll() {
-        if (quicAuthStream) {
+        if (quicAuthStream && !authDone) {
             quicReadFramedMessageOrDie(quicAuthStream, AuthStreamBuffer, [&] (uint8_t *frame, ssize_t frameLen) {
                 log(LOG_QUIC, "quic auth stream data l{} bytes\n", frameLen);
                 log(LOG_AUTH, "Auth step {}\n", authStep);
@@ -1084,6 +1102,15 @@ static void onIceReceive(NiceAgent *agent, guint _stream_id, guint component_id,
 }
 
 static void quicPoll() {
+    if (in_shutdown == ShutdownState::shutdownDone) {
+        writeUserMessage({
+                             {"event", "quit"},
+                         },
+                         "Quitting\n");
+        exit(0);
+        return;
+    }
+
     if (quic_client) {
         // TODO(openssl-branch) crashes or errors out if quic_poll is listener
         int ret0 = SSL_handle_events(quic_poll);
@@ -1097,49 +1124,99 @@ static void quicPoll() {
         }
     }
 
-    if (quic_client) {
-        if (!quicConnectionUp) {
-            int ret = SSL_connect(quic_client);
-            if (ret == 0) {
-                fatal_ossl("SSL_connect implausible return: {}\n", ret);
-            }
-            if (ret == 1) {
-                log(LOG_QUIC, "Got connection\n");
+    int shutdown = SSL_get_shutdown(quic_client ? quic_client : quic_connection);
+    if (shutdown) {
+        log(LOG_QUIC, "Shutdown state: {}\n", shutdown);
+    }
 
-                if (SSL_is_init_finished(quic_client)) {
-                    log(LOG_QUIC, "connection handshaked\n");
-                } else {
-                    fatal("unexpected unfinished handshare after SSL_connect\n");
+    if (in_shutdown == ShutdownState::shutdownPending) {
+        int ret = SSL_shutdown(quic_client ? quic_client : quic_connection);
+        if (ret < 0) {
+            fatal_ossl("SSL_shutdown failed:\n");
+        }
+        in_shutdown = ret ? in_shutdown = ShutdownState::shutdownDone : ShutdownState::shutdownPending;
+
+        if (in_shutdown == ShutdownState::shutdownDone) {
+            writeUserMessage({
+                                 {"event", "quit"},
+                             },
+                             "Quitting\n");
+            exit(0);
+            return;
+        }
+    } else if ((shutdown & (SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN)) == (SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN)) {
+        // when shutdown from remote we need to poll for completed connection close
+        int ret = SSL_shutdown(quic_client ? quic_client : quic_connection);
+        if (ret < 0) {
+            fatal_ossl("SSL_shutdown failed:\n");
+        }
+        if (ret) {
+            writeUserMessage({
+                                 {"event", "quit"},
+                             },
+                             "Quitting\n");
+            exit(0);
+            return;
+        }
+    } else if (shutdown == 0) {
+        if (quic_client) {
+            if (!quicConnectionUp) {
+                int ret = SSL_connect(quic_client);
+                if (ret == 0) {
+                    fatal_ossl("SSL_connect implausible return: {}\n", ret);
                 }
-                SSL_set_default_stream_mode(quic_client, SSL_DEFAULT_STREAM_MODE_NONE);
+                if (ret == 1) {
+                    log(LOG_QUIC, "Got connection\n");
 
-                quicConnectionUp = true;
-
-                constexpr int exportLen = 32;
-                guchar buf[exportLen];
-                const char *label = "exporter auth peersock";
-                ret = SSL_export_keying_material(quic_client, buf, exportLen, label, strlen(label), NULL, 0, 0);
-                if (ret != 1) {
-                    fatal_ossl("SSL_export_keying_material failed:\n");
-                }
-                log(LOG_AUTH, "Secret: {}/{}\n", ret, g_base64_encode(buf, exportLen));
-                std::visit([&] (auto &role) {
-                    if constexpr (std::is_same_v<typeof(role), std::monostate>) {
-                        fatal("Bad role\n");
+                    if (SSL_is_init_finished(quic_client)) {
+                        log(LOG_QUIC, "connection handshaked\n");
                     } else {
-                        role.handleQuicConnected(std::string_view{(const char*)buf, exportLen});
+                        fatal("unexpected unfinished handshare after SSL_connect\n");
                     }
-                }, role);
+                    SSL_set_default_stream_mode(quic_client, SSL_DEFAULT_STREAM_MODE_NONE);
+
+                    quicConnectionUp = true;
+
+                    constexpr int exportLen = 32;
+                    guchar buf[exportLen];
+                    const char *label = "exporter auth peersock";
+                    ret = SSL_export_keying_material(quic_client, buf, exportLen, label, strlen(label), NULL, 0, 0);
+                    if (ret != 1) {
+                        fatal_ossl("SSL_export_keying_material failed:\n");
+                    }
+                    log(LOG_AUTH, "Secret: {}/{}\n", ret, g_base64_encode(buf, exportLen));
+                    std::visit([&] (auto &role) {
+                        if constexpr (std::is_same_v<typeof(role), std::monostate>) {
+                            fatal("Bad role\n");
+                        } else {
+                            role.handleQuicConnected(std::string_view{(const char*)buf, exportLen});
+                        }
+                    }, role);
+
+                } else {
+                    int ssl_error = SSL_get_error(quic_client, ret);
+                    if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
+                        fatal_ossl("SSL_connect failed\n");
+                    }
+                }
 
             } else {
-                int ssl_error = SSL_get_error(quic_client, ret);
-                if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
-                    fatal_ossl("SSL_connect failed\n");
+                SSL *new_stream = SSL_accept_stream(quic_client, 0);
+                if (new_stream) {
+                    log(LOG_QUIC, "quic on_stream_open: {}\n", SSL_get_stream_id(new_stream));
+                    std::visit([&] (auto &role) {
+                        if constexpr (std::is_same_v<typeof(role), std::monostate>) {
+                            fatal("Bad role\n");
+                        } else {
+                            role.handleQuicStreamOpened(new_stream);
+                        }
+                    }, role);
                 }
             }
+        }
 
-        } else {
-            SSL *new_stream = SSL_accept_stream(quic_client, 0);
+        if (quic_connection && quicConnectionUp) {
+            SSL *new_stream = SSL_accept_stream(quic_connection, 0);
             if (new_stream) {
                 log(LOG_QUIC, "quic on_stream_open: {}\n", SSL_get_stream_id(new_stream));
                 std::visit([&] (auto &role) {
@@ -1151,30 +1228,15 @@ static void quicPoll() {
                 }, role);
             }
         }
+
+        std::visit([&] (auto &role) {
+            if constexpr (std::is_same_v<typeof(role), std::monostate>) {
+                fatal("Bad role\n");
+            } else {
+                role.quicPoll();
+            }
+        }, role);
     }
-
-    if (quic_connection && quicConnectionUp) {
-        SSL *new_stream = SSL_accept_stream(quic_connection, 0);
-        if (new_stream) {
-            log(LOG_QUIC, "quic on_stream_open: {}\n", SSL_get_stream_id(new_stream));
-            std::visit([&] (auto &role) {
-                if constexpr (std::is_same_v<typeof(role), std::monostate>) {
-                    fatal("Bad role\n");
-                } else {
-                    role.handleQuicStreamOpened(new_stream);
-                }
-            }, role);
-        }
-    }
-
-    std::visit([&] (auto &role) {
-        if constexpr (std::is_same_v<typeof(role), std::monostate>) {
-            fatal("Bad role\n");
-        } else {
-            role.quicPoll();
-        }
-    }, role);
-
 
     constexpr int buf_size = 1024*64;
     char buf[buf_size] = {0};
