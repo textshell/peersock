@@ -513,7 +513,10 @@ struct RoleInitiator {
                     sendAuthFrame(buf1Ptr, buf1Len);
                     log(LOG_AUTH, "SM msg4: {}/{}\n", buf1Len, g_base64_encode(buf1Ptr, buf1Len));
                     free(buf1Ptr);
-                    fmt::print("Auth success\n");
+                    writeUserMessage({
+                                         {"event", "auth-success"},
+                                     },
+                                     "Auth success\n");
                     authDone = true;
                     if (!mode) {
                         fatal("Bad mode\n");
@@ -573,7 +576,6 @@ struct RoleInitiator {
             code = fmt::format("{}-{}-{}-{}", nameplate,
                                words[dist(rnd)], words[dist(rnd)], words[dist(rnd)], words[dist(rnd)]);
             codeCallback(code);
-            //fmt::print(stderr, "Connection Code is: {}\n", code);
 
             sendRendMessage(wsConnection, {
                             {"type", "claim"},
@@ -741,7 +743,10 @@ struct RoleFromCode {
                         fatal("otrl_sm_step5 failed: {:x}\n", ret);
                         exit(1);
                     }
-                    fmt::print("Auth success\n");
+                    writeUserMessage({
+                                         {"event", "auth-success"},
+                                     },
+                                     "Auth success\n");
                     authDone = true;
                     if (!mode) {
                         fatal("Bad mode\n");
@@ -962,7 +967,11 @@ static void onIceComponentStateChanged(NiceAgent *agent, guint streamId, guint c
 
 static void OnRendClose(SoupWebsocketConnection *conn, gpointer data) {
     soup_websocket_connection_close(conn, SOUP_WEBSOCKET_CLOSE_NORMAL, nullptr);
-    fmt::print(stderr, "WebSocket connection closed\n");
+    writeUserMessage({
+                         {"event", "error"},
+                         {"message", "WebSocket connection closed"},
+                     },
+                     "WebSocket connection closed\n");
 }
 
 static void OnRendConnection(SoupSession *session, GAsyncResult *res, gpointer data) {

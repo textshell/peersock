@@ -107,7 +107,11 @@ int main(int argc, char **argv) {
         startFromCode(code, std::move(mode));
     } else {
         startGeneratingCode([](const std::string &generated_code) {
-            fmt::print(stderr, "Connection Code is: {}\n", generated_code);
+            writeUserMessage({
+                                 {"event", "code-generated"},
+                                 {"code", generated_code},
+                             },
+                             "Connection Code is: {}\n", generated_code);
         }, std::move(mode));
     }
 

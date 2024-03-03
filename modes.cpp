@@ -159,7 +159,11 @@ void ListenMode::quicPoll() {
 
 void ListenMode::acceptCallback(GObject *source_object, GAsyncResult *res) {
     if (_localConnection) {
-        fmt::print(stderr, "Error: Only one connection implemented.\n");
+        writeUserMessage({
+                             {"event", "error"},
+                             {"message", "Only one connection implemented."},
+                         },
+                         "Error: Only one connection implemented.\n");
         return;
     }
     (void)source_object;
