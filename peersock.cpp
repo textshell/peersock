@@ -644,6 +644,9 @@ struct RoleInitiator {
                         fatal("Could not allocate ice agent\n");
                     }
 
+                    g_object_set(G_OBJECT(iceAgent), "stun-server", "freestun.net", NULL);
+                    g_object_set(G_OBJECT(iceAgent), "stun-server-port", 3479, NULL);
+
                     gboolean controlling = true;
                     g_object_set(iceAgent, "controlling-mode", controlling, NULL);
                     g_signal_connect(iceAgent, "candidate-gathering-done", G_CALLBACK(onIceCandidateGatheringDone), NULL);
@@ -832,6 +835,9 @@ struct RoleFromCode {
             if (!iceAgent) {
                 fatal("Could not allocate ice agent\n");
             }
+
+            g_object_set(G_OBJECT(iceAgent), "stun-server", "freestun.net", NULL);
+            g_object_set(G_OBJECT(iceAgent), "stun-server-port", 3479, NULL);
 
             gboolean controlling = false;
             g_object_set(iceAgent, "controlling-mode", controlling, NULL);
