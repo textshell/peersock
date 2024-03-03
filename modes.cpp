@@ -132,7 +132,7 @@ ListenMode::ListenMode(uint16_t port) : _port(port) {
     g_socket_listener_accept_async(_listener, nullptr, wrap_acceptCallback, this);
 }
 
-void ListenMode::connectionMade(std::function<void()> tick, SSL *connection) {
+void ListenMode::connectionMade(std::function<void()> tick, RemoteConnection *connection) {
     _tick = tick;
     q_connection = connection;
     _bridged = true;
@@ -172,7 +172,7 @@ void ListenMode::acceptCallback(GObject *source_object, GAsyncResult *res) {
         log(LOG_FWD, "Incoming connection from {}:{}\n", g_inet_address_to_string(remoteInetAddr),
             g_inet_socket_address_get_port((GInetSocketAddress*)remoteAddr));
         if (_bridged) {
-            _bridgeStream = SSL_new_stream(q_connection, 0);
+            _bridgeStream = SSL_new_stream(q_connection->ssl(), 0);
             if (!_bridgeStream) {
                 fatal_ossl("SSL_new_stream for bridging:\n");
             }
@@ -201,7 +201,7 @@ ConnectMode::ConnectMode(std::string hostAndPort) : _hostAndPort(hostAndPort) {
     _socketClient = g_socket_client_new();
 }
 
-void ConnectMode::connectionMade(std::function<void()> tick, SSL *connection) {
+void ConnectMode::connectionMade(std::function<void()> tick, RemoteConnection *connection) {
     _tick = tick;
     q_connection = connection;
     _bridged = true;
@@ -259,7 +259,7 @@ void ConnectMode::wrap_localConnectCallback(GObject *source_object, GAsyncResult
 StdioModeA::StdioModeA() {
 }
 
-void StdioModeA::connectionMade(std::function<void ()> tick, SSL *connection) {
+void StdioModeA::connectionMade(std::function<void ()> tick, RemoteConnection *connection) {
     _tick = tick;
     q_connection = connection;
     _bridged = true;
@@ -300,12 +300,12 @@ void StdioModeA::quicPoll() {
 StdioModeB::StdioModeB() {
 }
 
-void StdioModeB::connectionMade(std::function<void ()> tick, SSL *connection) {
+void StdioModeB::connectionMade(std::function<void ()> tick, RemoteConnection *connection) {
     _tick = tick;
     q_connection = connection;
     _bridged = true;
 
-    _bridgeStream = SSL_new_stream(q_connection, 0);
+    _bridgeStream = SSL_new_stream(q_connection->ssl(), 0);
     if (!_bridgeStream) {
         fatal_ossl("SSL_new_stream for bridging:\n");
     }

@@ -58,6 +58,19 @@ static SSL *quic_connection;
 
 static void quicPoll();
 
+class RemoteConnectionImpl : public RemoteConnection {
+public:
+    RemoteConnectionImpl(SSL *ssl) : _ssl(ssl) {}
+
+public:
+    SSL *ssl() override {
+        return _ssl;
+    }
+
+
+    SSL *_ssl = nullptr;
+};
+
 static std::array<std::string_view, 2048> words = {
     "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", "access",
     "accident", "account", "accuse", "achieve", "acid", "acoustic", "acquire", "across", "act", "action", "actor",
@@ -505,7 +518,7 @@ struct RoleInitiator {
                     if (!mode) {
                         fatal("Bad mode\n");
                     } else {
-                        mode->connectionMade(::quicPoll, quic_connection);
+                        mode->connectionMade(::quicPoll, new RemoteConnectionImpl(quic_connection));
                     }
                 }
             });
@@ -733,7 +746,7 @@ struct RoleFromCode {
                     if (!mode) {
                         fatal("Bad mode\n");
                     } else {
-                        mode->connectionMade(::quicPoll, quic_client);
+                        mode->connectionMade(::quicPoll, new RemoteConnectionImpl(quic_client));
                     }
                 }
             });

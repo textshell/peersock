@@ -54,7 +54,7 @@ private:
 struct ListenMode : public ModeBase {
     ListenMode(uint16_t port);
 
-    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    void connectionMade(std::function<void()> tick, RemoteConnection *connection) override;
 
     int handleQuicStreamOpened(SSL *stream) override;
 
@@ -71,7 +71,7 @@ private:
     GInputStream *_localInputStream = nullptr;
     GOutputStream *_localOutputStream = nullptr;
 
-    SSL *q_connection = nullptr;
+    RemoteConnection *q_connection = nullptr;
     std::function<void()> _tick;
     bool _bridged = false;
     SSL *_bridgeStream = nullptr;
@@ -83,7 +83,7 @@ private:
 struct ConnectMode : public ModeBase {
     ConnectMode(std::string hostAndPort);
 
-    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    void connectionMade(std::function<void()> tick, RemoteConnection *connection) override;
 
     int handleQuicStreamOpened(SSL *stream) override;
 
@@ -103,7 +103,7 @@ private:
     std::optional<SslToOutputStreamForwarder> _ssl_to_socket_forwarder;
     std::optional<InputStreamToSslForwarder> _socket_to_ssl_forwarder;
 
-    SSL *q_connection = nullptr;
+    RemoteConnection *q_connection = nullptr;
     std::function<void()> _tick;
     bool _bridged = false;
     SSL *_bridgeStream = nullptr;
@@ -112,7 +112,7 @@ private:
 struct StdioModeA : public ModeBase {
     StdioModeA();
 
-    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    void connectionMade(std::function<void()> tick, RemoteConnection *connection) override;
     int handleQuicStreamOpened(SSL *stream) override;
     void quicPoll() override;
 
@@ -122,7 +122,7 @@ private:
     std::optional<SslToOutputStreamForwarder> _ssl_to_socket_forwarder;
     std::optional<InputStreamToSslForwarder> _socket_to_ssl_forwarder;
 
-    SSL *q_connection = nullptr;
+    RemoteConnection *q_connection = nullptr;
     std::function<void()> _tick;
     bool _bridged = false;
     SSL *_bridgeStream = nullptr;
@@ -131,7 +131,7 @@ private:
 struct StdioModeB : public ModeBase {
     StdioModeB();
 
-    void connectionMade(std::function<void()> tick, SSL *connection) override;
+    void connectionMade(std::function<void()> tick, RemoteConnection *connection) override;
     int handleQuicStreamOpened(SSL *stream) override;
     void quicPoll() override;
 
@@ -139,7 +139,7 @@ private:
     GInputStream *_localInputStream = nullptr;
     GOutputStream *_localOutputStream = nullptr;
 
-    SSL *q_connection = nullptr;
+    RemoteConnection *q_connection = nullptr;
     std::function<void()> _tick;
     bool _bridged = false;
     SSL *_bridgeStream = nullptr;

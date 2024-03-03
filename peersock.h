@@ -7,6 +7,11 @@
 
 #include "utils.h"
 
+class RemoteConnection {
+public:
+    virtual SSL *ssl() = 0;
+};
+
 struct ModeBase {
     virtual void quicPoll() {};
 
@@ -17,7 +22,7 @@ struct ModeBase {
         return 0;
     }
 
-    virtual void connectionMade(std::function<void()> tick, SSL *connection) {};
+    virtual void connectionMade(std::function<void()> tick, RemoteConnection *connection) {};
 };
 
 
