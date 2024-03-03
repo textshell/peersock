@@ -115,6 +115,7 @@ int main(int argc, char **argv) {
         }, std::move(mode));
     }
 
+    signal(SIGPIPE, SIG_IGN);
 
     g_main_loop_run (mainLoop);
     g_main_loop_unref (mainLoop);
