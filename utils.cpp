@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <unistd.h>
+
 #include <openssl/ssl.h>
 
 int logEnabled = 0
@@ -9,6 +11,13 @@ int logEnabled = 0
         // | LOG_AUTH
         // | LOG_FWD
         ;
+
+bool peersockJsonOutputMode;
+
+void setJsonOutputMode(bool val) {
+    peersockJsonOutputMode = val;
+}
+
 
 int quicReadOrDie(SSL *stream, char *buf, int len) {
     int ret = 0;
@@ -28,3 +37,6 @@ int quicReadOrDie(SSL *stream, char *buf, int len) {
     return ret;
 }
 
+void printToStdErr(char *data, int len) {
+    write(2, data, len);
+}
