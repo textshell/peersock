@@ -640,20 +640,25 @@ struct RoleInitiator {
                 log(LOG_REND, "Got remote message: {}\n", data.value("body", ""));
                 if (data.value("phase", "") == "ice"s) {
                     iceAgent = nice_agent_new(g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, NICE_COMPATIBILITY_RFC5245);
-                    // assert(agent)
+                    if (!iceAgent) {
+                        fatal("Could not allocate ice agent\n");
+                    }
+
                     gboolean controlling = true;
                     g_object_set(iceAgent, "controlling-mode", controlling, NULL);
                     g_signal_connect(iceAgent, "candidate-gathering-done", G_CALLBACK(onIceCandidateGatheringDone), NULL);
                     g_signal_connect(iceAgent, "component-state-changed", G_CALLBACK(onIceComponentStateChanged), NULL);
 
                     guint streamId = nice_agent_add_stream(iceAgent, 1);
-                    // assert(stream_id)
+                    if (!streamId) {
+                        fatal("Invalid zero stream id\n");
+                    }
 
                     nice_agent_attach_recv(iceAgent, streamId, 1, g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, onIceReceive, NULL);
 
-                    nice_agent_gather_candidates(iceAgent, streamId);
-                    // assert return value
-
+                    if (!nice_agent_gather_candidates(iceAgent, streamId)) {
+                        fatal("nice_agent_gather_candidates failed.\n");
+                    }
 
                     return WaitingForLocalCandidates{data, streamId};
                 }
@@ -824,19 +829,25 @@ struct RoleFromCode {
             std::string mailbox = data.value("mailbox", "");
 
             iceAgent = nice_agent_new(g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, NICE_COMPATIBILITY_RFC5245);
-            // assert(agent)
+            if (!iceAgent) {
+                fatal("Could not allocate ice agent\n");
+            }
+
             gboolean controlling = false;
             g_object_set(iceAgent, "controlling-mode", controlling, NULL);
             g_signal_connect(iceAgent, "candidate-gathering-done", G_CALLBACK(onIceCandidateGatheringDone), NULL);
             g_signal_connect(iceAgent, "component-state-changed", G_CALLBACK(onIceComponentStateChanged), NULL);
 
             guint streamId = nice_agent_add_stream(iceAgent, 1);
-            // assert(stream_id)
+            if (!streamId) {
+                fatal("Invalid zero stream id\n");
+            }
 
             nice_agent_attach_recv(iceAgent, streamId, 1, g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, onIceReceive, NULL);
 
-            nice_agent_gather_candidates(iceAgent, streamId);
-            // assert return value
+            if (!nice_agent_gather_candidates(iceAgent, streamId)) {
+                fatal("nice_agent_gather_candidates failed.\n");
+            }
 
             return WaitingForLocalCandidates{mailbox, streamId};
         } else if (type == "ack"s) {
