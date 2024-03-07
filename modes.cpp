@@ -14,7 +14,7 @@ SslToOutputStreamForwarder::SslToOutputStreamForwarder(std::function<void()> tic
 
 void SslToOutputStreamForwarder::quicPoll() {
     if (!_buffer_busy) {
-        log(LOG_FWD, "Looking for data...\n", read);
+        log(LOG_FWD, "Looking for data...\n");
         int read = quicReadOrDie(_ssl_stream, (char*)_buffer.data(), _buffer.size());
 
         if (read) {
