@@ -1,0 +1,6 @@
+option('avoidsoup3',
+  type : 'boolean',
+  value : false,
+  description : 'Build subprojects to avoid a system libsoup3'
+)
+
