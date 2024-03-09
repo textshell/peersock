@@ -5,6 +5,7 @@ project('peersock', ['c', 'cpp'],
     'libsoup:gssapi=disabled',
     'libsoup:gnome=false',
     'libsoup:introspection=disabled',
+    'libsoup:sysprof=disabled',
     'libnice:gupnp=disabled'
     ]
   )
