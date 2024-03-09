@@ -127,6 +127,8 @@ int main(int argc, char **argv) {
     if (!ok) {
         fmt::print(stderr, "Usage: {} listen port [connect code]\n", argv[0]);
         fmt::print(stderr, "       {} connect host:port [connect code]\n", argv[0]);
+        fmt::print(stderr, "       {} stdio-a [connect code]\n", argv[0]);
+        fmt::print(stderr, "       {} stdio-b [connect code]\n", argv[0]);
         return 1;
     }
 
