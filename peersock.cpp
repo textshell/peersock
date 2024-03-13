@@ -372,7 +372,7 @@ static void sendICE(SoupWebsocketConnection *wsConnection, int streamId) {
         candJson["f"] = candidate->foundation;
         candJson["a"] = ipString;
         candJson["p"] = nice_address_get_port(&candidate->addr);
-        candJson["t"] = candidate->transport;
+        candJson["tr"] = candidate->transport;
         candJson["l"] = candidate->priority;
         candJson["t"] = candidate->type;
 
@@ -409,7 +409,7 @@ static void applyRemoteICE(nlohmann::json msg, int streamId) {
         NiceCandidate *candidate = nice_candidate_new(candJson["t"]);
         candidate->component_id = 1;
         candidate->stream_id = streamId;
-        candidate->transport = candJson["t"];
+        candidate->transport = candJson["tr"];
         std::string foundation = candJson["f"];
         g_strlcpy(candidate->foundation, foundation.data(), NICE_CANDIDATE_MAX_FOUNDATION);
         candidate->priority = candJson["l"];
