@@ -11,6 +11,10 @@
 struct PeersockConfig {
     std::string stunServer;
     std::optional<int> stunPort;
+    std::string turnServer;
+    std::optional<int> turnPort;
+    std::string turnUser;
+    std::string turnPassword;
 };
 
 

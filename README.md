@@ -39,7 +39,7 @@ peersock currently uses the following hard coded external services:
 * relay.magic-wormhole.io for ICE data exchange via nameplates.
 
 And the following default services:
-* freestun.org as STUN server
+* freestun.org as STUN/TURN server
 
 Usage
 -----
@@ -86,6 +86,11 @@ Example:
 [ice]
 stun=freestun.net
 stun-port=3479
+
+turn=freestun.net
+turn-port=3479
+turn-user=free
+turn-password=free
 ```
 
 Building

@@ -315,6 +315,32 @@ static void sendAuthFrame(unsigned char *bufPtr, int bufLen) {
     }
 }
 
+static std::vector<std::string> resolveNameToIps(std::string name) {
+    std::vector<std::string> result;
+    GResolver *res = g_resolver_get_default();
+    GList *addrs;
+    GError *error = nullptr;
+
+    addrs = g_resolver_lookup_by_name(res, name.data(), nullptr, &error);
+
+
+    if (!addrs) {
+        g_printerr("Error resolving turn server ip '%s': %s\n", name.data(), error->message);
+        g_error_free(error);
+    }
+
+    for (guint i = 0; i < g_list_length(addrs); i++) {
+         gchar *tmp = g_inet_address_to_string(G_INET_ADDRESS(g_list_nth_data(addrs, i)));
+         result.push_back(tmp);
+         g_free(tmp);
+    }
+
+    g_resolver_free_addresses(addrs);
+    g_object_unref(res);
+
+    return result;
+}
+
 
 static std::unique_ptr<ModeBase> mode;
 
@@ -660,6 +686,13 @@ struct RoleInitiator {
                         fatal("Invalid zero stream id\n");
                     }
 
+                    // for some reason this didn't work without manually resolving the server to ips.
+                    auto ips = resolveNameToIps(config.turnServer);
+                    for (std::string ip: ips) {
+                        nice_agent_set_relay_info(iceAgent, streamId, 1, ip.data(), *config.turnPort, config.turnUser.data(), config.turnPassword.data(), NICE_RELAY_TYPE_TURN_UDP);
+                        nice_agent_set_relay_info(iceAgent, streamId, 1, ip.data(), *config.turnPort, config.turnUser.data(), config.turnPassword.data(), NICE_RELAY_TYPE_TURN_TCP);
+                    }
+
                     nice_agent_attach_recv(iceAgent, streamId, 1, g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, onIceReceive, NULL);
 
                     if (!nice_agent_gather_candidates(iceAgent, streamId)) {
@@ -851,6 +884,13 @@ struct RoleFromCode {
             guint streamId = nice_agent_add_stream(iceAgent, 1);
             if (!streamId) {
                 fatal("Invalid zero stream id\n");
+            }
+
+            // for some reason this didn't work without manually resolving the server to ips.
+            auto ips = resolveNameToIps(config.turnServer);
+            for (std::string ip: ips) {
+                nice_agent_set_relay_info(iceAgent, streamId, 1, ip.data(), *config.turnPort, config.turnUser.data(), config.turnPassword.data(), NICE_RELAY_TYPE_TURN_UDP);
+                nice_agent_set_relay_info(iceAgent, streamId, 1, ip.data(), *config.turnPort, config.turnUser.data(), config.turnPassword.data(), NICE_RELAY_TYPE_TURN_TCP);
             }
 
             nice_agent_attach_recv(iceAgent, streamId, 1, g_main_context_get_thread_default() /*g_main_loop_get_context (mainLoop)*/, onIceReceive, NULL);
@@ -1436,6 +1476,22 @@ void applyConfigDefaults(PeersockConfig &config) {
 
     if (!config.stunPort) {
         config.stunPort = 3479;
+    }
+
+    if (config.turnServer.empty()) {
+        config.turnServer = "freestun.net";
+    }
+
+    if (!config.turnPort) {
+        config.turnPort = 3479;
+    }
+
+    if (config.turnUser.empty()) {
+        config.turnUser = "free";
+    }
+
+    if (config.turnPassword.empty()) {
+        config.turnPassword = "free";
     }
 }
 

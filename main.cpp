@@ -56,6 +56,68 @@ void applyConfig(PeersockConfig &config) {
             config.stunPort = tmp;
         }
     }
+
+    const char *turnServer = g_key_file_get_string(configFile, "ice", "turn", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting turn server from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else if (config.turnServer.empty() && turnServer && *turnServer) {
+        config.turnServer = turnServer;
+    }
+
+    tmp = g_key_file_get_integer(configFile, "ice", "turn-port", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting turn-port from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else {
+        if (!config.turnPort) {
+            config.turnPort = tmp;
+        }
+    }
+
+    const char *turnUser = g_key_file_get_string(configFile, "ice", "turn-user", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting turn-user from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else if (config.turnUser.empty() && turnUser && *turnUser) {
+        config.turnUser = turnUser;
+    }
+
+    const char *turnPassword = g_key_file_get_string(configFile, "ice", "turn-password", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting turn-password from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else if (config.turnPassword.empty() && turnPassword && *turnPassword) {
+        config.turnPassword = turnPassword;
+    }
 }
 
 int main(int argc, char **argv) {
