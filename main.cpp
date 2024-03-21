@@ -9,6 +9,55 @@
 using namespace std::string_literals;
 
 
+void applyConfig(PeersockConfig &config) {
+    GKeyFile *configFile = g_key_file_new();
+    GError *error = nullptr;
+
+    char *configFilename = g_build_filename(g_get_user_config_dir(), "peersock.conf", nullptr);
+
+    bool loaded = g_key_file_load_from_file(configFile,
+                                       configFilename,
+                                       G_KEY_FILE_NONE, &error);
+
+    if (!loaded) {
+        if (!g_error_matches(error, G_FILE_ERROR, G_FILE_ERROR_NOENT)) {
+            g_printerr("%s parsing failed: %s\n", configFilename, error->message);
+        }
+        return;
+    }
+    const char *stunServer = g_key_file_get_string(configFile, "ice", "stun", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting stun server from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else if (config.stunServer.empty() && stunServer && *stunServer) {
+        config.stunServer = stunServer;
+    }
+
+    int tmp = g_key_file_get_integer(configFile, "ice", "stun-port", &error);
+
+    if (error) {
+        if (!g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND)
+            && !g_error_matches(error, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+
+            g_printerr("error getting stun-port from config: %s\n", error->message);
+            return;
+        } else {
+            g_clear_error(&error);
+        }
+    } else {
+        if (!config.stunPort) {
+            config.stunPort = tmp;
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     /*
     // Test code for secret possession proof code
@@ -134,8 +183,12 @@ int main(int argc, char **argv) {
 
     static GMainLoop *mainLoop = g_main_loop_new (NULL, TRUE);
 
+
+    PeersockConfig config;
+    applyConfig(config);
+
     if (code.size()) {
-        startFromCode(code, std::move(mode));
+        startFromCode(code, std::move(mode), config);
     } else {
         startGeneratingCode([](const std::string &generated_code) {
             writeUserMessage({
@@ -143,7 +196,7 @@ int main(int argc, char **argv) {
                                  {"code", generated_code},
                              },
                              "Connection Code is: {}\n", generated_code);
-        }, std::move(mode));
+        }, std::move(mode), config);
     }
 
     signal(SIGPIPE, SIG_IGN);

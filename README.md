@@ -36,8 +36,10 @@ The resulting QUIC connection is than authenticated using
 For this authentication the full connection code is used as a password.
 
 peersock currently uses the following hard coded external services:
-* freestun.org as STUN server
 * relay.magic-wormhole.io for ICE data exchange via nameplates.
+
+And the following default services:
+* freestun.org as STUN server
 
 Usage
 -----
@@ -71,6 +73,20 @@ Auth success
 
 Now a connection to localhost port 5900 on host bob will be forwarded to port 5900 on host alice.
 
+Configuration
+-------------
+
+Configuration is read from $XDG_CONFIG_DIR/peersock.conf (e.g. $HOME/.config/peersock.conf).
+
+If the file does not exist or a value is not set, a default is used.
+
+Example:
+
+```
+[ice]
+stun=freestun.net
+stun-port=3479
+```
 
 Building
 --------

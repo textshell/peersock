@@ -7,6 +7,13 @@
 
 #include "utils.h"
 
+
+struct PeersockConfig {
+    std::string stunServer;
+    std::optional<int> stunPort;
+};
+
+
 class RemoteConnection {
 public:
     virtual SSL *ssl() = 0;
@@ -27,5 +34,5 @@ struct ModeBase {
 };
 
 
-void startFromCode(const std::string &code, std::unique_ptr<ModeBase> &&mode_);
-void startGeneratingCode(std::function<void(std::string)> codeCallback, std::unique_ptr<ModeBase> &&mode_);
+void startFromCode(const std::string &code, std::unique_ptr<ModeBase> &&mode_, PeersockConfig config);
+void startGeneratingCode(std::function<void(std::string)> codeCallback, std::unique_ptr<ModeBase> &&mode_, PeersockConfig config);

@@ -440,6 +440,9 @@ static void applyRemoteICE(nlohmann::json msg, int streamId) {
 
 
 struct RoleInitiator {
+    RoleInitiator(PeersockConfig config) : config(config) {};
+
+    PeersockConfig config;
     SoupWebsocketConnection *wsConnection;
     std::string nameplate;
     std::string code;
@@ -644,8 +647,8 @@ struct RoleInitiator {
                         fatal("Could not allocate ice agent\n");
                     }
 
-                    g_object_set(G_OBJECT(iceAgent), "stun-server", "freestun.net", NULL);
-                    g_object_set(G_OBJECT(iceAgent), "stun-server-port", 3479, NULL);
+                    g_object_set(G_OBJECT(iceAgent), "stun-server", config.stunServer.data(), NULL);
+                    g_object_set(G_OBJECT(iceAgent), "stun-server-port", config.stunPort, NULL);
 
                     gboolean controlling = true;
                     g_object_set(iceAgent, "controlling-mode", controlling, NULL);
@@ -700,6 +703,7 @@ struct RoleInitiator {
 
 struct RoleFromCode {
     std::string code;
+    PeersockConfig config;
     SoupWebsocketConnection *wsConnection;
     std::string localSide = "code";
     bool authDone = false;
@@ -836,8 +840,8 @@ struct RoleFromCode {
                 fatal("Could not allocate ice agent\n");
             }
 
-            g_object_set(G_OBJECT(iceAgent), "stun-server", "freestun.net", NULL);
-            g_object_set(G_OBJECT(iceAgent), "stun-server-port", 3479, NULL);
+            g_object_set(G_OBJECT(iceAgent), "stun-server", config.stunServer.data(), NULL);
+            g_object_set(G_OBJECT(iceAgent), "stun-server-port", config.stunPort, NULL);
 
             gboolean controlling = false;
             g_object_set(iceAgent, "controlling-mode", controlling, NULL);
@@ -1425,15 +1429,27 @@ static void init() {
 }
 
 
-void startFromCode(const std::string &code, std::unique_ptr<ModeBase> &&mode_) {
-    init();
-    mode = std::move(mode_);
-    role = RoleFromCode{code};
+void applyConfigDefaults(PeersockConfig &config) {
+    if (config.stunServer.empty()) {
+        config.stunServer = "freestun.net";
+    }
+
+    if (!config.stunPort) {
+        config.stunPort = 3479;
+    }
 }
 
-void startGeneratingCode(std::function<void(std::string)> codeCallback_, std::unique_ptr<ModeBase> &&mode_) {
+void startFromCode(const std::string &code, std::unique_ptr<ModeBase> &&mode_, PeersockConfig config) {
     init();
+    applyConfigDefaults(config);
+    mode = std::move(mode_);
+    role = RoleFromCode{code, config};
+}
+
+void startGeneratingCode(std::function<void(std::string)> codeCallback_, std::unique_ptr<ModeBase> &&mode_, PeersockConfig config) {
+    init();
+    applyConfigDefaults(config);
     mode = std::move(mode_);
     codeCallback = codeCallback_;
-    role = RoleInitiator();
+    role = RoleInitiator(config);
 }
