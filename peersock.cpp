@@ -491,6 +491,10 @@ struct RoleInitiator {
     void handleQuicConnected(std::string_view tlsExport) {
         // other side starts management streams, nothing to do here
         auth = authSecret(tlsExport, code);
+        if (wsConnection && soup_websocket_connection_get_state(wsConnection) == SOUP_WEBSOCKET_STATE_OPEN) {
+            soup_websocket_connection_close(wsConnection, SOUP_WEBSOCKET_CLOSE_NORMAL, nullptr);
+            wsConnection = nullptr;
+        }
     }
 
     int handleQuicStreamOpened(SSL *stream) {
@@ -753,6 +757,11 @@ struct RoleFromCode {
         }, state);
     }
     void handleQuicConnected(std::string_view tlsExport) {
+        if (wsConnection && soup_websocket_connection_get_state(wsConnection) == SOUP_WEBSOCKET_STATE_OPEN) {
+            soup_websocket_connection_close(wsConnection, SOUP_WEBSOCKET_CLOSE_NORMAL, nullptr);
+            wsConnection = nullptr;
+        }
+
         auto auth = authSecret(tlsExport, code);
         quicKeepaliveStream = SSL_new_stream(quic_client, 0);
         g_timeout_add(15000, keepAliveTimer, nullptr);
@@ -1045,12 +1054,14 @@ static void onIceComponentStateChanged(NiceAgent *agent, guint streamId, guint c
 
 
 static void OnRendClose(SoupWebsocketConnection *conn, gpointer data) {
-    soup_websocket_connection_close(conn, SOUP_WEBSOCKET_CLOSE_NORMAL, nullptr);
-    writeUserMessage({
-                         {"event", "error"},
-                         {"message", "WebSocket connection closed"},
-                     },
-                     "WebSocket connection closed\n");
+    if (soup_websocket_connection_get_state(conn) == SOUP_WEBSOCKET_STATE_OPEN) {
+        soup_websocket_connection_close(conn, SOUP_WEBSOCKET_CLOSE_NORMAL, nullptr);
+        writeUserMessage({
+                             {"event", "error"},
+                             {"message", "WebSocket connection closed"},
+                         },
+                         "WebSocket connection closed\n");
+    }
 }
 
 static void OnRendConnection(SoupSession *session, GAsyncResult *res, gpointer data) {
